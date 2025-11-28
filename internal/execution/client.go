@@ -34,7 +34,7 @@ func isReady(addr, token string, timeout int64, syncTolerance uint64) error {
 		if dist > 0 {
 			log.Printf("Node is syncing but within tolerance (%d <= %d). Checking block age...", dist, syncTolerance)
 		}
-	}
+	} // <--- QUESTA ERA LA PARENTESI MANCANTE
 
 	// get latest block info
 	block, err := getLatestBlock(addr, token, timeout)

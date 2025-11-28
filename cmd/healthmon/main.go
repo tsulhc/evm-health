@@ -21,10 +21,9 @@ type Options struct {
 
 	Execution struct {
 		Jwt string `long:"engine-jwt" description:"JWT hex secret path. Use only when connecting to the engine RPC endpoint."`
+		// NUOVO FLAG
+		SyncTolerance uint64 `long:"sync-tolerance" description:"Max block lag tolerance while syncing. Useful for fast chains like Arbitrum." default:"0"`
 	} `group:"Execution chain" namespace:"execution"`
-
-	SyncTolerance uint64 `long:"sync-tolerance" description:"Max block lag tolerance while syncing. Useful for fast chains like Arbitrum." default:"0"`
-        } `group:"Execution chain" namespace:"execution"`
 
 	Beacon struct {
 		Certificate string `long:"certificate" description:"TLS root certificate path. Specify only if you have it configured for your node as well."`
@@ -39,6 +38,9 @@ type Options struct {
 var state *common.State
 
 func main() {
+	// Disabilita i timestamp di Go (lasciamo fare a journalctl)
+	log.SetFlags(0)
+
 	var opts Options
 	parser := flags.NewParser(&opts, flags.Default)
 	_, err := parser.Parse()
@@ -60,12 +62,13 @@ func main() {
 	nodeAddr := fmt.Sprintf("%s:%d", opts.Addr, nodePort)
 
 	switch opts.Chain {
-	case "beacon":
-		beacon.StartUpdater(state, nodeAddr, opts.Timeout, opts.Beacon.Certificate)
-	case "execution":
-		execution.StartUpdater(state, nodeAddr, opts.Timeout, opts.Execution.Jwt,  opts.Execution.SyncTolerance)
-	default:
-		log.Fatalf("unknown chain: %s.\n", opts.Chain)
+		case "beacon":
+			beacon.StartUpdater(state, nodeAddr, opts.Timeout, opts.Beacon.Certificate)
+		case "execution":
+			// Passiamo il nuovo parametro SyncTolerance
+			execution.StartUpdater(state, nodeAddr, opts.Timeout, opts.Execution.Jwt, opts.Execution.SyncTolerance)
+		default:
+			log.Fatalf("unknown chain: %s.\n", opts.Chain)
 	}
 
 	log.Printf("%s node address is %s", opts.Chain, nodeAddr)
