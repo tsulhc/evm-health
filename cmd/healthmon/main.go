@@ -23,6 +23,9 @@ type Options struct {
 		Jwt string `long:"engine-jwt" description:"JWT hex secret path. Use only when connecting to the engine RPC endpoint."`
 	} `group:"Execution chain" namespace:"execution"`
 
+	SyncTolerance uint64 `long:"sync-tolerance" description:"Max block lag tolerance while syncing. Useful for fast chains like Arbitrum." default:"0"`
+        } `group:"Execution chain" namespace:"execution"`
+
 	Beacon struct {
 		Certificate string `long:"certificate" description:"TLS root certificate path. Specify only if you have it configured for your node as well."`
 	} `group:"Beacon chain" namespace:"beacon"`
@@ -60,7 +63,7 @@ func main() {
 	case "beacon":
 		beacon.StartUpdater(state, nodeAddr, opts.Timeout, opts.Beacon.Certificate)
 	case "execution":
-		execution.StartUpdater(state, nodeAddr, opts.Timeout, opts.Execution.Jwt)
+		execution.StartUpdater(state, nodeAddr, opts.Timeout, opts.Execution.Jwt,  opts.Execution.SyncTolerance)
 	default:
 		log.Fatalf("unknown chain: %s.\n", opts.Chain)
 	}

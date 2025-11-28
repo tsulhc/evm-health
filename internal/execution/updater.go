@@ -8,7 +8,7 @@ import (
 	"github.com/alexallah/ethereum-healthmon/internal/common"
 )
 
-func StartUpdater(state *common.State, addr string, timeout int64, jwtPath string) {
+func StartUpdater(state *common.State, addr string, timeout int64, jwtPath string, syncTolerance uint64) {
 	var secret []byte
 	if jwtPath != "" {
 		secret = loadJwt(jwtPath)
@@ -17,10 +17,11 @@ func StartUpdater(state *common.State, addr string, timeout int64, jwtPath strin
 	if !strings.HasPrefix(addr, "http") {
 		addr = fmt.Sprintf("http://%s", addr)
 	}
-	go update(state, addr, timeout, secret)
+	// MODIFICA QUI: Passiamo syncTolerance alla goroutine update
+	go update(state, addr, timeout, secret, syncTolerance)
 }
 
-func update(state *common.State, addr string, timeout int64, secret []byte) {
+func update(state *common.State, addr string, timeout int64, secret []byte, syncTolerance uint64) {
 	for {
 		time.Sleep(time.Second)
 
@@ -28,7 +29,7 @@ func update(state *common.State, addr string, timeout int64, secret []byte) {
 		if secret != nil {
 			token = genToken(secret)
 		}
-		err := isReady(addr, token, timeout)
+		err := isReady(addr, token, timeout, syncTolerance)
 
 		if err != nil {
 			state.Error(err)

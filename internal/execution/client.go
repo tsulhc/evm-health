@@ -17,17 +17,24 @@ import (
 
 var blockTrack common.BlockTrack
 
-func isReady(addr, token string, timeout int64) error {
+func isReady(addr, token string, timeout int64, syncTolerance uint64) error {
 	// is syncing?
 	syncInfo, err := getSyncing(addr, token, timeout)
 	if err != nil {
 		return err
 	}
+
 	if syncInfo != nil {
-		return fmt.Errorf("syncing, distance %d blocks", syncInfo.distance())
+		dist := syncInfo.distance()
+
+		if dist > syncTolerance {
+			return fmt.Errorf("syncing, distance %d blocks (tolerance: %d)", dist, syncTolerance)
+		}
+
+		if dist > 0 {
+		log.Printf("Node is syncing but within tolerance (%d <= %d). Checking block age...", dist, syncTolerance)
 	}
 
-	// get latest block info
 	block, err := getLatestBlock(addr, token, timeout)
 	if err != nil {
 		return err
