@@ -14,15 +14,15 @@ import (
 )
 
 type Options struct {
-	Chain   string `long:"chain" description:"Ethereum chain" choice:"execution" choice:"beacon" required:"true"`
-	Port    int    `long:"port" description:"Node port (default: 8545 for execution, 4000 for beacon)"`
-	Addr    string `long:"addr" description:"Node address" default:"localhost"`
+	// Aggiunta la scelta "avax"
+	Chain   string `long:"chain" description:"Chain type" choice:"execution" choice:"beacon" choice:"avax" required:"true"`
+	Port    int    `long:"port" description:"Node port (default: 8545 for execution, 9650 for avax, 4000 for beacon)"`
+	Addr    string `long:"addr" description:"Node host address" default:"localhost"`
 	Timeout int64  `long:"timeout" description:"Node connection timeout, seconds" default:"5"`
 
 	Execution struct {
-		Jwt string `long:"engine-jwt" description:"JWT hex secret path. Use only when connecting to the engine RPC endpoint."`
-		// NUOVO FLAG
-		SyncTolerance uint64 `long:"sync-tolerance" description:"Max block lag tolerance while syncing. Useful for fast chains like Arbitrum." default:"0"`
+		Jwt           string `long:"engine-jwt" description:"JWT hex secret path. Use only when connecting to the engine RPC endpoint."`
+		SyncTolerance uint64 `long:"sync-tolerance" description:"Max block lag tolerance while syncing." default:"0"`
 	} `group:"Execution chain" namespace:"execution"`
 
 	Beacon struct {
@@ -38,7 +38,7 @@ type Options struct {
 var state *common.State
 
 func main() {
-	// Disabilita i timestamp di Go (lasciamo fare a journalctl)
+	// Log puliti per systemd
 	log.SetFlags(0)
 
 	var opts Options
@@ -50,30 +50,43 @@ func main() {
 
 	state = new(common.State)
 
-	// default node port
-	nodePort := 8545 // execution
-	if opts.Chain == "beacon" {
-		nodePort = 4000
+	// Definizione Porta di Default in base alla chain
+	nodePort := opts.Port
+	if nodePort == 0 {
+		switch opts.Chain {
+			case "beacon":
+				nodePort = 4000
+			case "avax":
+				nodePort = 9650
+			default: // execution
+				nodePort = 8545
+		}
 	}
-	// custom override
-	if opts.Port != 0 {
-		nodePort = opts.Port
-	}
-	nodeAddr := fmt.Sprintf("%s:%d", opts.Addr, nodePort)
+
+	// Costruzione dell'indirizzo del nodo
+	var nodeAddr string
 
 	switch opts.Chain {
-		case "beacon":
-			beacon.StartUpdater(state, nodeAddr, opts.Timeout, opts.Beacon.Certificate)
-		case "execution":
-			// Passiamo il nuovo parametro SyncTolerance
+		case "avax":
+			nodeAddr = fmt.Sprintf("http://%s:%d/ext/bc/C/rpc", opts.Addr, nodePort)
+
 			execution.StartUpdater(state, nodeAddr, opts.Timeout, opts.Execution.Jwt, opts.Execution.SyncTolerance)
+
+		case "execution":
+			nodeAddr = fmt.Sprintf("%s:%d", opts.Addr, nodePort)
+			execution.StartUpdater(state, nodeAddr, opts.Timeout, opts.Execution.Jwt, opts.Execution.SyncTolerance)
+
+		case "beacon":
+			nodeAddr = fmt.Sprintf("%s:%d", opts.Addr, nodePort)
+			beacon.StartUpdater(state, nodeAddr, opts.Timeout, opts.Beacon.Certificate)
+
 		default:
 			log.Fatalf("unknown chain: %s.\n", opts.Chain)
 	}
 
 	log.Printf("%s node address is %s", opts.Chain, nodeAddr)
 	serviceAddr := fmt.Sprintf("%s:%d", opts.Service.Addr, opts.Service.Port)
-	log.Printf("healthmon listenting on %s\n", serviceAddr)
+	log.Printf("healthmon listening on %s\n", serviceAddr)
 
 	http.HandleFunc("/ready", statusHandler)
 	http.HandleFunc("/metrics", metricsHandler)

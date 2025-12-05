@@ -34,7 +34,7 @@ func isReady(addr, token string, timeout int64, syncTolerance uint64) error {
 		if dist > 0 {
 			log.Printf("Node is syncing but within tolerance (%d <= %d). Checking block age...", dist, syncTolerance)
 		}
-	} // <--- QUESTA ERA LA PARENTESI MANCANTE
+	}
 
 	// get latest block info
 	block, err := getLatestBlock(addr, token, timeout)
@@ -74,7 +74,15 @@ func (s *SyncInfo) highestBlock() uint64 {
 }
 
 func (s *SyncInfo) distance() uint64 {
-	return s.highestBlock() - s.currentBlock()
+	h := s.highestBlock()
+	c := s.currentBlock()
+
+	// Protezione contro underflow se highestBlock è 0 (parsing fallito o campo mancante)
+	// o se il nodo riporta dati incoerenti temporanei.
+	if h < c {
+		return 0
+	}
+	return h - c
 }
 
 // json unmarshal helper
@@ -154,11 +162,20 @@ func getSyncing(addr, token string, timeout int64) (*SyncInfo, error) {
 	return nil, nil
 }
 
+// parseUintFromHex parses a hex string safely without panicking
 func parseUintFromHex(hex string) uint64 {
+	if hex == "" {
+		return 0
+	}
 	trimmed := strings.TrimPrefix(hex, "0x")
+	if trimmed == "" {
+		return 0
+	}
 	result, err := strconv.ParseUint(trimmed, 16, 64)
 	if err != nil {
-		log.Panicf("error parsing hex %v: %q", hex, err)
+		// Log warning instead of panic to prevent service crash on malformed/empty responses
+		log.Printf("warning: error parsing hex '%v': %v. Defaulting to 0.", hex, err)
+		return 0
 	}
 	return result
 }
